@@ -175,10 +175,10 @@ def predict_url(url, show_debug=False):
         safe_points = sum(1 for val in features if val == 0)
         if safe_points >= 10:
             
-            st.success(f"✅ The URL '{url}' has {safe_points} safe points and is likely **Safe**.")
+            st.success(f"✅ The URL '{url}' **Safe**.")
         else:
             
-            st.error(f"❌ The URL '{url}' has {safe_points} safe points and is likely **Malicious**.")
+            st.error(f"❌ The URL '{url}' **Malicious**.")
 
     return prediction
 
