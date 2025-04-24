@@ -15,7 +15,7 @@ import requests
 # Constants
 FILENAME = 'xgboost_model.pkl'
 SHORTENING_SERVICES = r"bit\.ly|goo\.gl|shorte\.st|tinyurl|t\.co|is\.gd|cli\.gs|tiny\.cc|url4\.eu|ow\.ly|j\.mp"
-SAFE_THRESHOLD = 12
+SAFE_THRESHOLD = 11
 
 # Load the model
 loaded_model = pickle.load(open(FILENAME, 'rb'))
