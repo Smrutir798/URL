@@ -173,7 +173,7 @@ def predict_url(url, show_debug=False):
         st.table(feature_data)
 
         safe_points = sum(1 for val in features if val == 0)
-        if safe_points >= 12:
+        if safe_points >= 11:
             
             st.success(f"✅ The URL '{url}' has {safe_points} safe points and is likely **Safe**.")
         else:
