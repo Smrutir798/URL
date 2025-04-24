@@ -1,4 +1,6 @@
 streamlit
-scikit-learn
-numpy
 xgboost
+beautifulsoup4
+python-whois
+requests
+urllib3
