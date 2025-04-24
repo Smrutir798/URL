@@ -12,16 +12,11 @@ import urllib.request
 from datetime import datetime
 import requests
 
-# Load trained XGBoost model
 filename = 'xgboost_model.pkl'
 loaded_model = pickle.load(open(filename, 'rb'))
 
-# Shortening services regex
-SHORTENING_SERVICES = r"bit\.ly|goo\.gl|shorte\.st|tinyurl|t\.co|is\.gd|cli\.gs|tiny\.cc|url4\.eu|ow\.ly|j\.mp"
 
-# -------------------------------
-# 🔎 Feature extraction functions
-# -------------------------------
+SHORTENING_SERVICES = r"bit\.ly|goo\.gl|shorte\.st|tinyurl|t\.co|is\.gd|cli\.gs|tiny\.cc|url4\.eu|ow\.ly|j\.mp"
 
 def clean_domain(url):
     try:
@@ -168,17 +163,17 @@ def predict_url(url, show_debug=False):
             "DNS Record Present", "Web Traffic < 100k", "Domain Age < 6 months", "Domain Expiry < 6 months",
             "IFrame Detected", "Mouse Over Events", "Right Click Disabled", "Redirect History > 2"
         ]
-        feature_data = [{"Feature": label, "Status": "✅ Safe" if val == 0 else "⚠️ Suspicious"} 
+        feature_data = [{"Feature": label, "Status": "✅ Safe" if val == 0 else "⚠️ Suspicious"}
                         for label, val in zip(feature_labels, features)]
         st.table(feature_data)
 
         safe_points = sum(1 for val in features if val == 0)
-        if safe_points >= 11:
-            
-            st.success(f"✅ The URL '{url}' **Safe**.")
+        if safe_points >= 12:
+
+            st.success(f"✅ The URL '{url}' has {safe_points} safe points and is likely **Safe**.")
         else:
-            
-            st.error(f"❌ The URL '{url}' **Malicious**.")
+
+            st.error(f"❌ The URL '{url}' has {safe_points} safe points and is likely **Malicious**.")
 
     return prediction
 
