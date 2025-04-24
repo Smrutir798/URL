@@ -7,23 +7,25 @@ import ipaddress
 import re
 from bs4 import BeautifulSoup
 import whois
-import urllib
+import urllib.parse
 import urllib.request
 from datetime import datetime
 import requests
 
-filename = 'xgboost_model.pkl'
-loaded_model = pickle.load(open(filename, 'rb'))
-
-
+# Constants
+FILENAME = 'xgboost_model.pkl'
 SHORTENING_SERVICES = r"bit\.ly|goo\.gl|shorte\.st|tinyurl|t\.co|is\.gd|cli\.gs|tiny\.cc|url4\.eu|ow\.ly|j\.mp"
+SAFE_THRESHOLD = 12
 
+# Load the model
+loaded_model = pickle.load(open(FILENAME, 'rb'))
+
+# Utility functions
 def clean_domain(url):
     try:
         parsed = urlparse(url)
-        domain = parsed.netloc
-        return domain.split(':')[0]
-    except:
+        return parsed.netloc.split(':')[0]
+    except Exception:
         return ""
 
 def having_ip(url):
@@ -40,16 +42,13 @@ def get_length(url):
     return 1 if len(url) >= 54 else 0
 
 def get_depth(url):
-    path_segments = urlparse(url).path.split('/')
-    return sum(1 for segment in path_segments if segment)
+    return sum(1 for segment in urlparse(url).path.split('/') if segment)
 
 def redirection(url):
-    pos = url.rfind('//')
-    return 1 if pos > 6 else 0
+    return 1 if url.rfind('//') > 6 else 0
 
 def http_domain(url):
-    domain = urlparse(url).netloc
-    return 1 if 'https' in domain else 0
+    return 1 if 'https' in urlparse(url).netloc else 0
 
 def tiny_url(url):
     return 1 if re.search(SHORTENING_SERVICES, url) else 0
@@ -59,11 +58,13 @@ def prefix_suffix(url):
 
 def web_traffic(url):
     try:
-        url = urllib.parse.quote(url)
-        rank = BeautifulSoup(urllib.request.urlopen(
-            "http://data.alexa.com/data?cli=10&dat=s&url=" + url).read(), "xml").find("REACH")['RANK']
+        url_encoded = urllib.parse.quote(url)
+        rank = BeautifulSoup(
+            urllib.request.urlopen(f"http://data.alexa.com/data?cli=10&dat=s&url={url_encoded}").read(),
+            "xml"
+        ).find("REACH")['RANK']
         return 1 if int(rank) < 100000 else 0
-    except:
+    except Exception:
         return 1
 
 def domain_age(domain_name):
@@ -76,7 +77,7 @@ def domain_age(domain_name):
             expiration_date = datetime.strptime(expiration_date, '%Y-%m-%d')
         age_in_months = (expiration_date - creation_date).days / 30
         return 0 if age_in_months >= 6 else 1
-    except:
+    except Exception:
         return 1
 
 def domain_end(domain_name):
@@ -86,71 +87,65 @@ def domain_end(domain_name):
             expiration_date = datetime.strptime(expiration_date, '%Y-%m-%d')
         remaining_months = (expiration_date - datetime.now()).days / 30
         return 0 if remaining_months >= 6 else 1
-    except:
+    except Exception:
         return 1
 
 def iframe(response):
-    if response == "":
-        return 1
     return 1 if not re.findall(r"<iframe>|<frameBorder>", response.text) else 0
 
 def mouse_over(response):
-    if response == "":
-        return 1
     return 1 if re.findall("<script>.+onmouseover.+</script>", response.text) else 0
 
 def right_click(response):
-    if response == "":
-        return 1
     return 1 if not re.findall(r"event.button ?== ?2", response.text) else 0
 
 def forwarding(response):
-    if response == "":
-        return 1
     return 1 if len(response.history) > 2 else 0
 
-# ----------------------------
-# 🔧 Main feature extractor
-# ----------------------------
+# Feature extraction
 def feature_extraction(url):
     features = []
 
     # Address bar-based features
-    features.append(having_ip(url))
-    features.append(have_at_sign(url))
-    features.append(get_length(url))
-    features.append(get_depth(url))
-    features.append(redirection(url))
-    features.append(http_domain(url))
-    features.append(tiny_url(url))
-    features.append(prefix_suffix(url))
+    features.extend([
+        having_ip(url),
+        have_at_sign(url),
+        get_length(url),
+        get_depth(url),
+        redirection(url),
+        http_domain(url),
+        tiny_url(url),
+        prefix_suffix(url)
+    ])
 
     # Domain-based features
     try:
         domain_clean = clean_domain(url)
         domain_name = whois.whois(domain_clean)
-        features.append(0)  # DNS record present
-        features.append(web_traffic(url))  # Optional
-        features.append(domain_age(domain_name))
-        features.append(domain_end(domain_name))
-    except:
+        features.extend([
+            0,  # DNS record present
+            web_traffic(url),
+            domain_age(domain_name),
+            domain_end(domain_name)
+        ])
+    except Exception:
         features.extend([1, 1, 1, 1])
 
     # HTML/JS-based features
     try:
         response = requests.get(url, timeout=5)
-        features.append(iframe(response))
-        features.append(mouse_over(response))
-        features.append(right_click(response))
-        features.append(forwarding(response))
-    except:
+        features.extend([
+            iframe(response),
+            mouse_over(response),
+            right_click(response),
+            forwarding(response)
+        ])
+    except Exception:
         features.extend([1, 1, 1, 1])
 
     return features
 
-# ----------------------------------
-# 🚀 Model prediction with breakdown
-# ----------------------------------
+# Prediction and breakdown
 def predict_url(url, show_debug=False):
     features = feature_extraction(url)
     prediction = loaded_model.predict([features])[0]
@@ -163,23 +158,19 @@ def predict_url(url, show_debug=False):
             "DNS Record Present", "Web Traffic < 100k", "Domain Age < 6 months", "Domain Expiry < 6 months",
             "IFrame Detected", "Mouse Over Events", "Right Click Disabled", "Redirect History > 2"
         ]
-        feature_data = [{"Feature": label, "Status": "✅ Safe" if val == 0 else "⚠️ Suspicious"}
+        feature_data = [{"Feature": label, "Status": "✅ Safe" if val == 0 else "⚠️ Suspicious"} 
                         for label, val in zip(feature_labels, features)]
         st.table(feature_data)
 
         safe_points = sum(1 for val in features if val == 0)
-        if safe_points >= 12:
-
+        if safe_points >= SAFE_THRESHOLD:
             st.success(f"✅ The URL '{url}' has {safe_points} safe points and is likely **Safe**.")
         else:
-
             st.error(f"❌ The URL '{url}' has {safe_points} safe points and is likely **Malicious**.")
 
     return prediction
 
-# -------------------------
-# 🎨 Streamlit UI starts
-# -------------------------
+# Streamlit UI
 st.set_page_config(page_title="URL Maliciousness Predictor", page_icon="🔍")
 st.title("🔍 URL Maliciousness Predictor")
 st.markdown("Enter a URL below to check if it might be **malicious** or **safe** based on machine learning and handcrafted features.")
@@ -188,6 +179,6 @@ url = st.text_input("🌐 Enter a URL to check:")
 
 if st.button("🚦 Predict"):
     if url:
-        prediction = predict_url(url, show_debug=True)
+        predict_url(url, show_debug=True)
     else:
         st.warning("⚠️ Please enter a valid URL.")
